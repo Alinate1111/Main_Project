@@ -1,0 +1,831 @@
+import React, { useState, useRef } from "react";
+import labelImageLogo from "./label-image-logo.svg";
+import vector from "./vector.svg";
+
+interface FileWithText {
+  file: File;
+  text?: string;
+  isConverting?: boolean;
+  error?: string;
+  folderName?: string; // 폴더에서 업로드된 경우 폴더 이름
+  isCancelled?: boolean; // 변환 취소 여부
+}
+
+interface FolderGroup {
+  folderName: string;
+  files: FileWithText[];
+  isExpanded: boolean;
+  isConverting?: boolean;
+  convertedCount?: number; // 변환 완료된 파일 수
+  totalCount?: number; // 전체 파일 수
+}
+
+export const Section = (): JSX.Element => {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<FileWithText[]>([]);
+  const [folderGroups, setFolderGroups] = useState<FolderGroup[]>([]);
+  const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
+  const [expandedConvertedFolders, setExpandedConvertedFolders] = useState<Set<number>>(new Set());
+  const [expandedConvertedFiles, setExpandedConvertedFiles] = useState<Set<string>>(new Set());
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer.files).filter(
+      (file) => file.type === "application/pdf",
+    );
+    const newFiles = files.map(file => ({ file }));
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files).filter(
+        (file) => file.type === "application/pdf",
+      );
+
+      // 개별 파일 추가
+      const newFiles = files.map(file => ({ file }));
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+    }
+
+    // 입력 초기화 (같은 파일을 다시 선택할 수 있도록)
+    e.target.value = '';
+  };
+
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files).filter(
+        (file) => file.type === "application/pdf",
+      );
+
+      // 폴더에서 업로드된 파일들을 그룹화
+      const folderMap = new Map<string, File[]>();
+
+      files.forEach(file => {
+        // webkitRelativePath가 있으면 폴더에서 업로드된 것
+        const path = (file as any).webkitRelativePath;
+        if (path) {
+          const folderName = path.split('/')[0];
+          if (!folderMap.has(folderName)) {
+            folderMap.set(folderName, []);
+          }
+          folderMap.get(folderName)!.push(file);
+        }
+      });
+
+      // 폴더 그룹 추가
+      if (folderMap.size > 0) {
+        const newFolders: FolderGroup[] = Array.from(folderMap.entries()).map(([folderName, files]) => ({
+          folderName,
+          files: files.map(file => ({ file, folderName })),
+          isExpanded: false,
+        }));
+        setFolderGroups(prev => [...prev, ...newFolders]);
+      }
+    }
+
+    // 입력 초기화 (같은 폴더를 다시 선택할 수 있도록)
+    e.target.value = '';
+  };
+
+  const handleBrowseFilesClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleBrowseFolderClick = () => {
+    folderInputRef.current?.click();
+  };
+
+  const removeFile = (index: number) => {
+    // 개별 파일은 항상 목록에서 제거
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+
+    if (selectedFileIndex === index) {
+      setSelectedFileIndex(null);
+    }
+  };
+
+  const convertToText = async (fileIndex: number) => {
+  const fileWithText = uploadedFiles[fileIndex];
+  if (!fileWithText) return;
+
+  // 개별 파일 변환 상태 업데이트
+  setUploadedFiles(prev => prev.map((item, i) =>
+    i === fileIndex ? { ...item, isConverting: true, error: undefined } : item
+  ));
+
+  try {
+    const formData = new FormData();
+    formData.append('pdfFile', fileWithText.file);
+
+    const response = await fetch('http://127.0.0.1:5000/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Conversion failed');
+    }
+
+    const data = await response.json();
+
+    setUploadedFiles(prev => prev.map((item, i) =>
+      i === fileIndex ? { ...item, text: data.text, isConverting: false } : item
+    ));
+  } catch (error: any) {
+    setUploadedFiles(prev => prev.map((item, i) =>
+      i === fileIndex ? { ...item, error: error.message || 'Failed to convert PDF', isConverting: false } : item
+    ));
+  }
+};
+
+  const handleCardClick = (index: number) => {
+    setSelectedFileIndex(selectedFileIndex === index ? null : index);
+  };
+
+  // 폴더 전체 변환
+  const convertFolderToText = async (folderIndex: number) => {
+    const folder = folderGroups[folderIndex];
+    if (!folder) return;
+
+    // 변환이 필요한 파일만 필터링 (이미 변환된 파일이나 에러난 파일 제외)
+    const filesToConvert = folder.files.filter(f => !f.text && !f.error);
+
+    if (filesToConvert.length === 0) {
+      return; // 변환할 파일이 없으면 종료
+    }
+
+    // 폴더 변환 상태 업데이트
+    setFolderGroups(prev => prev.map((f, i) =>
+      i === folderIndex ? { ...f, isConverting: true, convertedCount: 0, totalCount: filesToConvert.length } : f
+    ));
+
+    // 취소된 파일은 취소 표시 제거
+    setFolderGroups(prev => prev.map((f, i) => {
+      if (i === folderIndex) {
+        const updatedFiles = f.files.map(file => {
+          if (file.isCancelled && !file.text) {
+            return { ...file, isCancelled: false };
+          }
+          return file;
+        });
+        return { ...f, files: updatedFiles };
+      }
+      return f;
+    }));
+
+    // 각 파일을 순차적으로 변환 (진행 상황 표시를 위해)
+    let completedCount = 0;
+
+    for (let fileIndex = 0; fileIndex < folder.files.length; fileIndex++) {
+      const fileWithText = folder.files[fileIndex];
+
+      // 이미 변환된 파일이나 에러난 파일은 건너뛰기
+      if (fileWithText.text || fileWithText.error) {
+        continue;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('pdfFile', fileWithText.file);
+
+        const response = await fetch('http://127.0.0.1:5000/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Conversion failed');
+        }
+
+        const data = await response.json();
+
+        // 개별 파일 변환 완료 업데이트
+        completedCount++;
+        setFolderGroups(prev => prev.map((f, i) => {
+          if (i === folderIndex) {
+            const updatedFiles = f.files.map((item, j) =>
+              j === fileIndex ? { ...item, text: data.text, isConverting: false } : item
+            );
+            return { ...f, files: updatedFiles, convertedCount: completedCount };
+          }
+          return f;
+        }));
+      } catch (error: any) {
+        completedCount++;
+        setFolderGroups(prev => prev.map((f, i) => {
+          if (i === folderIndex) {
+            const updatedFiles = f.files.map((item, j) =>
+              j === fileIndex ? { ...item, error: error.message || 'Failed to convert PDF', isConverting: false } : item
+            );
+            return { ...f, files: updatedFiles, convertedCount: completedCount };
+          }
+          return f;
+        }));
+      }
+    }
+
+    // 모든 변환 완료
+    setFolderGroups(prev => prev.map((f, i) =>
+      i === folderIndex ? { ...f, isConverting: false } : f
+    ));
+  };
+
+  // 폴더 내 개별 파일 변환
+  const convertFolderFileToText = async (folderIndex: number, fileIndex: number) => {
+    const folder = folderGroups[folderIndex];
+    if (!folder) return;
+
+    const fileWithText = folder.files[fileIndex];
+    if (!fileWithText) return;
+
+    // 개별 파일 변환 상태 업데이트
+    setFolderGroups(prev => prev.map((f, i) => {
+      if (i === folderIndex) {
+        const updatedFiles = f.files.map((item, j) =>
+          j === fileIndex ? { ...item, isConverting: true, error: undefined } : item
+        );
+        return { ...f, files: updatedFiles };
+      }
+      return f;
+    }));
+
+    try {
+      const formData = new FormData();
+      formData.append('pdfFile', fileWithText.file);
+
+      const response = await fetch('http://127.0.0.1:5000/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Conversion failed');
+      }
+
+      const data = await response.json();
+
+      setFolderGroups(prev => prev.map((f, i) => {
+        if (i === folderIndex) {
+          const updatedFiles = f.files.map((item, j) =>
+            j === fileIndex ? { ...item, text: data.text, isConverting: false } : item
+          );
+          return { ...f, files: updatedFiles };
+        }
+        return f;
+      }));
+    } catch (error: any) {
+      setFolderGroups(prev => prev.map((f, i) => {
+        if (i === folderIndex) {
+          const updatedFiles = f.files.map((item, j) =>
+            j === fileIndex ? { ...item, error: error.message || 'Failed to convert PDF', isConverting: false } : item
+          );
+          return { ...f, files: updatedFiles };
+        }
+        return f;
+      }));
+    }
+  };
+
+  const toggleFolderExpanded = (folderIndex: number) => {
+    setFolderGroups(prev => prev.map((f, i) =>
+      i === folderIndex ? { ...f, isExpanded: !f.isExpanded } : f
+    ));
+  };
+
+  const removeFolder = (folderIndex: number) => {
+    const folder = folderGroups[folderIndex];
+
+    // 변환 중인지 확인
+    if (folder.isConverting || folder.files.some(f => f.isConverting)) {
+      // 변환 중이면 취소 처리
+      setFolderGroups(prev => prev.map((f, i) => {
+        if (i === folderIndex) {
+          // 변환 중이거나 변환 전인 파일만 취소 표시, 이미 변환 완료된 파일은 유지
+          const updatedFiles = f.files.map(file => {
+            if (file.text) {
+              // 이미 변환 완료된 파일은 그대로 유지
+              return file;
+            } else {
+              // 변환 중이거나 변환 전인 파일만 취소
+              return {
+                ...file,
+                isCancelled: true,
+                isConverting: false
+              };
+            }
+          });
+          return { ...f, files: updatedFiles, isConverting: false };
+        }
+        return f;
+      }));
+    } else {
+      // 변환 중이 아니면 목록에서 제거
+      setFolderGroups(prev => prev.filter((_, i) => i !== folderIndex));
+    }
+  };
+
+  const removeFolderFile = (folderIndex: number, fileIndex: number) => {
+    const folder = folderGroups[folderIndex];
+    const fileWithText = folder.files[fileIndex];
+
+    // 변환 중이거나 변환 완료된 경우 취소로 표시
+    if (fileWithText && (fileWithText.isConverting || fileWithText.text)) {
+      setFolderGroups(prev => prev.map((f, i) => {
+        if (i === folderIndex) {
+          const updatedFiles = f.files.map((file, j) =>
+            j === fileIndex ? { ...file, isCancelled: true, isConverting: false } : file
+          );
+          return { ...f, files: updatedFiles };
+        }
+        return f;
+      }));
+    } else {
+      // 변환 전이면 목록에서 제거
+      setFolderGroups(prev => prev.map((f, i) => {
+        if (i === folderIndex) {
+          return { ...f, files: f.files.filter((_, j) => j !== fileIndex) };
+        }
+        return f;
+      }).filter(f => f.files.length > 0)); // 파일이 없는 폴더는 제거
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f6f8fc]">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <header className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            PDF to Text Converter
+          </h1>
+          <p className="text-lg text-gray-600">
+            Upload your PDFs and convert them to text instantly
+          </p>
+        </header>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column - Upload Area */}
+          <div className="space-y-6">
+            {/* Upload Box */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload PDF Files</h2>
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  isDragOver
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-300 hover:border-gray-400"
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                role="button"
+                tabIndex={0}
+                aria-label="Upload PDF files"
+              >
+                <img
+                  src={labelImageLogo}
+                  alt="PDF upload"
+                  className="w-16 h-16 mx-auto mb-4"
+                />
+                <p className="text-gray-600 mb-2">
+                  Drag & drop PDF files here
+                </p>
+                <p className="text-sm text-gray-500 mb-4">
+                  or click to browse
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={handleBrowseFilesClick}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <img src={vector} alt="" className="w-4 h-4" />
+                    Choose Files
+                  </button>
+                  <button
+                    onClick={handleBrowseFolderClick}
+                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                  >
+                    📁 Choose Folder
+                  </button>
+                </div>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              <input
+                ref={folderInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                multiple
+                // @ts-ignore
+                webkitdirectory=""
+                directory=""
+                onChange={handleFolderSelect}
+                className="hidden"
+              />
+            </div>
+
+            {/* Folder List */}
+            {folderGroups.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Uploaded Folders ({folderGroups.length})
+                </h3>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {folderGroups.map((folder, folderIndex) => (
+                    <div key={folderIndex} className="border rounded-lg">
+                      <div className="flex items-center justify-between p-3">
+                        <div
+                          className="flex items-center gap-3 flex-1 cursor-pointer"
+                          onClick={() => toggleFolderExpanded(folderIndex)}
+                        >
+                          <span className="text-gray-600">
+                            {folder.isExpanded ? '📂' : '📁'}
+                          </span>
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">
+                              {folder.folderName}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {folder.files.length} PDF files
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!folder.isConverting && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                convertFolderToText(folderIndex);
+                              }}
+                              className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                            >
+                              Convert All
+                            </button>
+                          )}
+                          {folder.isConverting && (
+                            <div className="flex items-center gap-2 px-3 py-1">
+                              <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                              <span className="text-blue-600 text-sm">
+                                Converting {folder.convertedCount || 0}/{folder.totalCount || 0}
+                              </span>
+                            </div>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFolder(folderIndex);
+                            }}
+                            className="p-1 text-red-600 hover:text-red-800 transition-colors"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 펼쳐진 상태일 때 파일 목록 표시 */}
+                      {folder.isExpanded && (
+                        <div className="border-t bg-gray-50 p-3 space-y-2">
+                          {folder.files.map((fileWithText, fileIndex) => (
+                            <div key={fileIndex} className="flex items-center justify-between p-2 bg-white rounded border">
+                              <div className="flex items-center gap-2">
+                                <img src={labelImageLogo} alt="PDF" className="w-6 h-6" />
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 truncate max-w-48">
+                                    {fileWithText.file.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {(fileWithText.file.size / 1024 / 1024).toFixed(2)} MB
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {fileWithText.isCancelled && (
+                                  <span className="text-xs text-yellow-600">⚠️ Cancelled</span>
+                                )}
+                                {fileWithText.text && !fileWithText.isCancelled && (
+                                  <span className="text-xs text-green-600">✅ Converted</span>
+                                )}
+                                {fileWithText.isConverting && (
+                                  <div className="flex items-center gap-1">
+                                    <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                                  </div>
+                                )}
+                                {!fileWithText.text && !fileWithText.isConverting && !fileWithText.isCancelled && (
+                                  <button
+                                    onClick={() => convertFolderFileToText(folderIndex, fileIndex)}
+                                    className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
+                                  >
+                                    Convert
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => removeFolderFile(folderIndex, fileIndex)}
+                                  className="p-1 text-red-600 hover:text-red-800 transition-colors text-sm"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* File List */}
+            {uploadedFiles.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Uploaded Files ({uploadedFiles.length})
+                </h3>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {uploadedFiles.map((fileWithText, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <img src={labelImageLogo} alt="PDF" className="w-8 h-8" />
+                        <div>
+                          <p className="font-medium text-gray-900 truncate max-w-48">
+                            {fileWithText.file.name}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {(fileWithText.file.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!fileWithText.text && !fileWithText.isConverting && (
+                          <button
+                            onClick={() => convertToText(index)}
+                            className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                          >
+                            Convert
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="p-1 text-red-600 hover:text-red-800 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Converted Files */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Converted Files</h2>
+
+              {uploadedFiles.filter(f => f.text || f.isConverting || f.error || f.isCancelled).length === 0 &&
+               folderGroups.every(folder => folder.files.every(f => !f.text && !f.isConverting && !f.error && !f.isCancelled)) ? (
+                <div className="text-center py-12">
+                  <div className="text-gray-400 text-6xl mb-4">📄</div>
+                  <p className="text-gray-500">No converted files yet</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    Upload and convert PDF files to see results here
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* 폴더별로 그룹화하여 표시 */}
+                  {folderGroups.map((folder, folderIndex) => {
+                    const hasConvertedFiles = folder.files.some(f => f.text || f.isConverting || f.error || f.isCancelled);
+                    if (!hasConvertedFiles) return null;
+
+                    const isFolderExpanded = expandedConvertedFolders.has(folderIndex);
+
+                    return (
+                      <div key={`converted-folder-${folderIndex}`} className="border rounded-lg">
+                        {/* 폴더 헤더 */}
+                        <div
+                          className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+                          onClick={() => {
+                            const newExpanded = new Set(expandedConvertedFolders);
+                            if (isFolderExpanded) {
+                              newExpanded.delete(folderIndex);
+                            } else {
+                              newExpanded.add(folderIndex);
+                            }
+                            setExpandedConvertedFolders(newExpanded);
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">{isFolderExpanded ? '📂' : '📁'}</span>
+                            <div>
+                              <p className="font-medium text-gray-900">{folder.folderName}</p>
+                              <p className="text-sm text-gray-500">
+                                {folder.files.filter(f => f.text && !f.isCancelled).length} converted files
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 폴더 내 파일들 */}
+                        {isFolderExpanded && (
+                          <div className="border-t bg-gray-50 p-3 space-y-2">
+                            {folder.files.map((fileWithText, fileIndex) => {
+                              if (!fileWithText.text && !fileWithText.isConverting && !fileWithText.error && !fileWithText.isCancelled) {
+                                return null;
+                              }
+
+                              const fileKey = `${folderIndex}-${fileIndex}`;
+                              const isFileExpanded = expandedConvertedFiles.has(fileKey);
+
+                              return (
+                                <div key={fileKey} className="bg-white border rounded-lg p-3">
+                                  <div
+                                    className="flex items-center justify-between cursor-pointer"
+                                    onClick={() => {
+                                      const newExpanded = new Set(expandedConvertedFiles);
+                                      if (isFileExpanded) {
+                                        newExpanded.delete(fileKey);
+                                      } else {
+                                        newExpanded.add(fileKey);
+                                      }
+                                      setExpandedConvertedFiles(newExpanded);
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <img src={labelImageLogo} alt="PDF" className="w-6 h-6" />
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium text-gray-900 truncate max-w-48">
+                                          {fileWithText.file.name}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                          {(fileWithText.file.size / 1024 / 1024).toFixed(2)} MB
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      {fileWithText.isCancelled && (
+                                        <span className="text-xs text-yellow-600">⚠️ Cancelled</span>
+                                      )}
+                                      {fileWithText.text && !fileWithText.isCancelled && (
+                                        <>
+                                          <span className="text-xs text-green-600">✅</span>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              navigator.clipboard.writeText(fileWithText.text || '');
+                                            }}
+                                            className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors"
+                                          >
+                                            Copy
+                                          </button>
+                                        </>
+                                      )}
+                                      {fileWithText.isConverting && (
+                                        <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                                      )}
+                                      {fileWithText.error && (
+                                        <span className="text-xs text-red-600">❌ Error</span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* 텍스트 내용 */}
+                                  {isFileExpanded && fileWithText.text && !fileWithText.isCancelled && (
+                                    <div className="mt-2 border-t pt-2">
+                                      <div className="bg-gray-50 rounded p-3 max-h-64 overflow-y-auto">
+                                        <pre className="whitespace-pre-wrap text-xs text-gray-800">
+                                          {fileWithText.text}
+                                        </pre>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {isFileExpanded && fileWithText.error && (
+                                    <div className="mt-2 text-red-600 text-xs">
+                                      ❌ {fileWithText.error}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* 개별 파일들 표시 */}
+                  {uploadedFiles.map((fileWithText, index) => {
+                    if (!fileWithText.text && !fileWithText.isConverting && !fileWithText.error && !fileWithText.isCancelled) {
+                      return null;
+                    }
+
+                    return (
+                      <div
+                        key={index}
+                        className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                          selectedFileIndex === index
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                        onClick={() => fileWithText.text ? handleCardClick(index) : null}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <img src={labelImageLogo} alt="PDF" className="w-8 h-8" />
+                            <div>
+                              <p className="font-medium text-gray-900 truncate max-w-48">
+                                {fileWithText.file.name}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {(fileWithText.file.size / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            </div>
+                          </div>
+
+                          {fileWithText.text && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(fileWithText.text || '');
+                              }}
+                              className="px-3 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm"
+                            >
+                              Copy
+                            </button>
+                          )}
+                        </div>
+
+                        {fileWithText.isConverting && (
+                          <div className="flex items-center gap-2 py-2">
+                            <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                            <span className="text-blue-600 text-sm">Converting to text...</span>
+                          </div>
+                        )}
+
+                        {fileWithText.error && (
+                          <div className="text-red-600 text-sm py-2">
+                            ❌ {fileWithText.error}
+                          </div>
+                        )}
+
+                        {fileWithText.isCancelled && (
+                          <div className="text-yellow-600 text-sm py-2">
+                            ⚠️ Conversion cancelled
+                          </div>
+                        )}
+
+                        {fileWithText.text && !fileWithText.isCancelled && (
+                          <div className="mt-2">
+                            <div className="flex items-center gap-2 text-green-600 text-sm mb-2">
+                              ✅ Conversion completed • Click to {selectedFileIndex === index ? 'hide' : 'view'} text
+                            </div>
+
+                            {selectedFileIndex === index && (
+                              <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                                <pre className="whitespace-pre-wrap text-sm text-gray-800">
+                                  {fileWithText.text}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

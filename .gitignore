@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+
+# React
+/front/react-front/build
+/front/react-front/.env.local
+/front/react-front/.env.development.local
+/front/react-front/.env.test.local
+/front/react-front/.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# PaddleOCR
+inference/
+*.pdparams
+*.pdiparams
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Output folders
+텍스트 변환 폴더/
+json/
+
+# OS
+Thumbs.db
+.DS_Store
