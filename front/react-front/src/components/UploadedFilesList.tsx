@@ -139,11 +139,15 @@ export const UploadedFilesList: React.FC<UploadedFilesListProps> = ({
       )}
 
       {/* File List */}
+      {/*주석처리 2025-10-13수정 */}
+      {/*
       {uploadedFiles.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-6">
+          
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             Uploaded Files ({uploadedFiles.length})
           </h3>
+          
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {uploadedFiles.map((fileWithText, index) => (
               <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
@@ -178,7 +182,7 @@ export const UploadedFilesList: React.FC<UploadedFilesListProps> = ({
             ))}
           </div>
         </div>
-      )}
+      )}*/}
     </div>
   );
 };

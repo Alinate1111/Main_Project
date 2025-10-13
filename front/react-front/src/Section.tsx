@@ -2,11 +2,14 @@ import React, { useState } from "react";
 import { UploadArea } from "./components/UploadArea";
 import { UploadedFilesList } from "./components/UploadedFilesList";
 import { ConvertedFilesList } from "./components/ConvertedFilesList";
+import { Category } from "./components/Category";
 import { usePDFConverter } from "./hooks/usePDFConverter";
 
 export const Section = (): React.JSX.Element => {
   const [isDragOver, setIsDragOver] = useState(false);
-
+  //여기 리스트안에 넣어주세요 (카테고리 목록변수)
+  const categoryList = ["회의록", "보고서", "기획안","테스트문자","값이 늘면 추가로"];
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const {
     uploadedFiles,
     setUploadedFiles,
@@ -97,14 +100,14 @@ export const Section = (): React.JSX.Element => {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            PDF to Text Converter
+            인공지는 AI분류
           </h1>
           <p className="text-gray-600">
-            Convert your PDF documents to editable text instantly
+            글로벌1조
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-6">
             <UploadArea
               isDragOver={isDragOver}
@@ -114,7 +117,7 @@ export const Section = (): React.JSX.Element => {
               onFileSelect={handleFileSelect}
               onFolderSelect={handleFolderSelect}
             />
-
+{/*
             {hasUploadedFiles && (
               <UploadedFilesList
                 folderGroups={folderGroups}
@@ -127,9 +130,15 @@ export const Section = (): React.JSX.Element => {
                 onConvertFile={convertToText}
                 onRemoveFile={removeFile}
               />
-            )}
+            )}*/ }
           </div>
-
+          <div className="space-y-2">
+              <Category
+                categoryList={categoryList}
+                selectedCategory={selectedCategory}
+                onSelect={setSelectedCategory}
+              />
+          </div>
           <div>
             <ConvertedFilesList
               folderGroups={folderGroups}
