@@ -27,7 +27,12 @@ export const Toplogin: React.FC = () => {
         } catch (error) {
           console.error(error);
       }
-    } else {
+    } 
+    else if(item === "로그아웃"){
+      setShowTestBtn(false)
+      setShowMenu(false)
+    }
+    else {
       alert(`${item} 클릭됨`);
     }
   };
