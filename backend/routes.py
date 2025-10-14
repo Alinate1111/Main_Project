@@ -1,10 +1,49 @@
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from typing import List
 import traceback
 from pdf_service import pdf_service
+from oracle_connect import get_connection
+from passlib.context import CryptContext
+from pydantic import BaseModel
 
 router = APIRouter()
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# ✅ 로그인 요청 모델
+class LoginRequest(BaseModel):
+    id: str
+    password: str
+
+# ✅ 로그인 API
+@router.post("/login")
+def login(data: LoginRequest):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT password, user_role, name FROM member WHERE id = :id", [data.id])
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not row:
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+
+        hashed_password, user_role, name = row
+
+        if not pwd_context.verify(data.password, hashed_password):
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+
+        return {
+            "message": f"Welcome {name}",
+            "role": user_role
+        }
+
+    except Exception as e:
+        print("로그인 에러:", str(e))
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="서버 내부 오류")
 
 
 @router.post("/upload")
