@@ -5,12 +5,11 @@ import { ConvertedFilesList } from "./components/ConvertedFilesList";
 import { Category } from "./components/Category";
 import { Toplogin } from "./components/Toplogin";
 import { Totalcount } from "./components/Totalcount";
+
 import { usePDFConverter } from "./hooks/usePDFConverter";
 
 export const Section = (): React.JSX.Element => {
   const [isDragOver, setIsDragOver] = useState(false);
-  //여기 리스트안에 넣어주세요 (카테고리 목록변수)
-  const categoryList = ["회의록", "보고서", "기획안","테스트문자","값이 늘면 추가로"];
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const {
     uploadedFiles,
@@ -167,7 +166,10 @@ export const Section = (): React.JSX.Element => {
               onCardClick={handleCardClick}
             />
           </div>
+         
+            
         </div>
+        
       </div>
     </section>
   );
