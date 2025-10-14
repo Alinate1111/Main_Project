@@ -2,11 +2,16 @@ import React, { useState } from "react";
 import { UploadArea } from "./components/UploadArea";
 import { UploadedFilesList } from "./components/UploadedFilesList";
 import { ConvertedFilesList } from "./components/ConvertedFilesList";
+import { Category } from "./components/Category";
+import { Toplogin } from "./components/Toplogin";
+import { Totalcount } from "./components/Totalcount";
 import { usePDFConverter } from "./hooks/usePDFConverter";
 
 export const Section = (): React.JSX.Element => {
   const [isDragOver, setIsDragOver] = useState(false);
-
+  //여기 리스트안에 넣어주세요 (카테고리 목록변수)
+  const categoryList = ["회의록", "보고서", "기획안","테스트문자","값이 늘면 추가로"];
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const {
     uploadedFiles,
     setUploadedFiles,
@@ -93,18 +98,33 @@ export const Section = (): React.JSX.Element => {
   const hasUploadedFiles = uploadedFiles.length > 0 || folderGroups.length > 0;
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            PDF to Text Converter
-          </h1>
-          <p className="text-gray-600">
-            Convert your PDF documents to editable text instantly
-          </p>
-        </div>
+    <section className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 ">
+      <Toplogin 
+      />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid gird-row-2">
+          <div className="text-center mb-8 grid grid-cols-3 gap-1">
+            <div></div>
+            <div className="grid grid-cols-2 gap-1 mt-5">
+                <div className="grid gird-row-2">
+                  <h1 className="text-center text-3xl font-bold text-gray-900 mb-2 py-5">
+                    인공지능 AI분류
+                  </h1>
+                  <p className="text-gray-600 text-center mb-5 ">
+                    글로벌1조
+                  </p> 
+
+                </div>
+              
+              <Totalcount />
+            </div>
+             <div></div>
+           
+          </div>
+           
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-6">
             <UploadArea
               isDragOver={isDragOver}
@@ -129,7 +149,12 @@ export const Section = (): React.JSX.Element => {
               />
             )}
           </div>
-
+          <div className="h-md bg-white rounded-xl  rounded-xl flex flex-col space-y-2">
+              <Category
+                selectedCategory={selectedCategory}
+                onSelect={setSelectedCategory}
+              />
+          </div>
           <div>
             <ConvertedFilesList
               folderGroups={folderGroups}
