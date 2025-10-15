@@ -94,7 +94,7 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
         type="file"
         accept=".pdf,application/pdf"
         multiple
-        onChange={handleFileSelect}
+        onChange={onFileSelect}
         className="hidden"
       />
 
