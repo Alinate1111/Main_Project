@@ -22,28 +22,65 @@ def login(data: LoginRequest):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT password, user_role, name FROM member WHERE id = :id", [data.id])
+
+        cursor.execute("""
+            SELECT user_id, password, user_role, name 
+            FROM member 
+            WHERE id = :id
+        """, [data.id])
         row = cursor.fetchone()
+
         cursor.close()
         conn.close()
 
         if not row:
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
-        hashed_password, user_role, name = row
+        user_id, hashed_password, user_role, name = row
 
+        # 비밀번호 검증
         if not pwd_context.verify(data.password, hashed_password):
             raise HTTPException(status_code=401, detail="Invalid username or password")
 
+        # 로그인 성공 응답
         return {
             "message": f"Welcome {name}",
-            "role": user_role
+            "user": {
+                "user_id": int(user_id),
+                "name": name,
+                "user_role": user_role
+            }
         }
 
     except Exception as e:
         print("로그인 에러:", str(e))
+        import traceback
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail="서버 내부 오류")
+
+
+# 파일 조회하는 api
+@router.get("/files/{user_id}")
+def get_files(user_id: int):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT file_name FROM file_history WHERE user_id = :user_id
+        """, {"user_id": user_id})  # 딕셔너리 바인딩
+
+        files = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        return {"files": [f[0] for f in files]}
+
+    except Exception as e:
+        print("파일 조회 에러:", str(e))
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="파일 조회 중 서버 오류")
 
 
 @router.post("/upload")

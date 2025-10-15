@@ -11,30 +11,77 @@
   <button onclick="login()">Login</button>
 
   <p id="result"></p>
+  <h3>Files</h3>
+  <ul id="file-list"></ul>
 
   <script>
-    async function login() {
-      const id = document.getElementById("id").value;
-      const password = document.getElementById("password").value;
+  async function login() {
+    const id = document.getElementById("id").value.trim();
+    const password = document.getElementById("password").value;
 
+    const resultText = document.getElementById("result");
+    const fileList = document.getElementById("file-list");
+    fileList.innerHTML = "";  // 파일 목록 초기화
+    resultText.innerText = ""; // 결과 메시지 초기화
+
+    if (!id || !password) {
+      resultText.innerText = "Please enter both username and password.";
+      return;
+    }
+
+    try {
       const response = await fetch("http://127.0.0.1:5000/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, password })
       });
 
-      const resultText = document.getElementById("result");
-
-      if (response.ok) {
-        const data = await response.json();
-        resultText.innerText = data.message + " (" + data.role + ")";
-      } else {
+      if (!response.ok) {
         const error = await response.json();
         resultText.innerText = "Login failed: " + error.detail;
+        return;
       }
+
+      const data = await response.json();
+
+      // 로그인 응답에서 필요한 정보만 출력
+      console.log("Login response data:", data);
+      console.log("User ID:", data.user?.user_id);
+      console.log("Username (id):", data.user?.id);
+      console.log("Name:", data.user?.name);
+      console.log("User role:", data.user?.user_role);
+
+      resultText.innerText = `${data.message} (${data.user.user_role})`;
+
+      if (!data.user?.user_id) {
+        console.warn("user_id not found in login response!");
+        fileList.innerHTML = "<li>User ID not found, cannot load files.</li>";
+        return;
+      }
+
+      // user_id로 파일 목록 조회
+      const filesResponse = await fetch(`http://127.0.0.1:5000/files/${data.user.user_id}`);
+      if (!filesResponse.ok) {
+        fileList.innerHTML = "<li>Failed to load files</li>";
+        return;
+      }
+
+      const filesData = await filesResponse.json();
+      if (filesData.files.length === 0) {
+        fileList.innerHTML = "<li>No files found</li>";
+      } else {
+        filesData.files.forEach(fileName => {
+          const li = document.createElement("li");
+          li.textContent = fileName;
+          fileList.appendChild(li);
+        });
+      }
+    } catch (error) {
+      console.error("Error during login or fetching files:", error);
+      resultText.innerText = "An unexpected error occurred.";
+      fileList.innerHTML = "";
     }
+  }
   </script>
 </body>
 </html>
