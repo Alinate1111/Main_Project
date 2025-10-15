@@ -1,8 +1,14 @@
 import React, { useState } from "react";
 
-export const Toplogin: React.FC = () => {
+
+interface loginProps {
+    onLoginClick: () => void;
+  }
+
+export const Toplogin: React.FC<loginProps>  = ({onLoginClick}) => {
   const [showTestBtn, setShowTestBtn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  
 
   const menuList = ["홈", "이력 확인", "로그아웃"];
 
@@ -38,10 +44,17 @@ export const Toplogin: React.FC = () => {
   };
 
   return (
-    <div className="bg-blue-100 border border-blue-100 rounded-md shadow-sm flex justify-end relative">
-      <div className="relative inline-block bg-white rounded-md shadow px-3 py-3 text-right">
-        {!showTestBtn && (
-          <button className="text-md" onClick={handleLoginClick}>
+    <div className="bg-blue-100 border border-blue-100 rounded-md shadow-sm relative w-full text-center">
+      <div className=" grid grid-cols-12 gap-1 ">
+          
+          <p className="text-black px-3 py-3 ">
+            글로벌1조
+          </p> 
+
+          <div 
+          className="relative inline-block bg-white rounded-md shadow px-3 py-3  float-right col-start-12">
+                    {!showTestBtn && (
+          <button className="text-md" onClick={onLoginClick}>
             로그인
           </button>
         )}
@@ -71,6 +84,10 @@ export const Toplogin: React.FC = () => {
             )}
           </div>
         )}
+          </div>
+      <div>
+          
+        </div>
       </div>
     </div>
   );

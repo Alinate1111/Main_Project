@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import labelImageLogo from "../label-image-logo.svg";
 import vector from "../vector.svg";
+import { FileWithText, FolderGroup } from "../types";
 
 interface UploadAreaProps {
   isDragOver: boolean;
@@ -29,7 +30,21 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
   const handleBrowseFolderClick = () => {
     folderInputRef.current?.click();
   };
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
 
+  };
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+  if (files) {
+    // files는 FileList 타입 (유사 배열)
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      console.log("파일 이름:", file.name);
+      console.log("파일 크기:", file.size);
+      console.log("파일 타입:", file.type);
+    }
+  }
+  };
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload PDF Files</h2>
@@ -79,7 +94,7 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
         type="file"
         accept=".pdf,application/pdf"
         multiple
-        onChange={onFileSelect}
+        onChange={handleFileSelect}
         className="hidden"
       />
 

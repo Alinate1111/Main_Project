@@ -5,12 +5,13 @@ import { ConvertedFilesList } from "./components/ConvertedFilesList";
 import { Category } from "./components/Category";
 import { Toplogin } from "./components/Toplogin";
 import { Totalcount } from "./components/Totalcount";
-
+import { LoginModal } from "./components/LoginModal";
 import { usePDFConverter } from "./hooks/usePDFConverter";
 
 export const Section = (): React.JSX.Element => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const {
     uploadedFiles,
     setUploadedFiles,
@@ -98,31 +99,23 @@ export const Section = (): React.JSX.Element => {
 
   return (
     <section className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 ">
-      <Toplogin 
+      <Toplogin
+        onLoginClick={() => setIsLoginModalOpen(true)}
       />
 
       <div className="max-w-7xl mx-auto">
-        <div className="grid gird-row-2">
-          <div className="text-center mb-8 grid grid-cols-3 gap-1">
-            <div></div>
-            <div className="grid grid-cols-2 gap-1 mt-5">
-                <div className="grid gird-row-2">
-                  <h1 className="text-center text-3xl font-bold text-gray-900 mb-2 py-5">
-                    인공지능 AI분류
-                  </h1>
-                  <p className="text-gray-600 text-center mb-5 ">
-                    글로벌1조
-                  </p> 
 
-                </div>
-              
-              <Totalcount />
+    
+          <div className="grid grid-cols-6 gap-1 mt-5">
+            <div className="grid grid-cols-2 col-start-2 col-span-4">
+              <h1 className="text-right text-3xl font-bold text-gray-900 mb-2 py-5">
+              인공지능 AI분류
+            </h1>
+            <Totalcount />
             </div>
-             <div></div>
-           
+            
           </div>
-           
-        </div>
+    
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-6">
             <UploadArea
@@ -171,6 +164,10 @@ export const Section = (): React.JSX.Element => {
         </div>
         
       </div>
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
     </section>
   );
 };
