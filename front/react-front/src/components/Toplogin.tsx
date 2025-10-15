@@ -50,6 +50,9 @@ export const Toplogin: React.FC<loginProps>  = ({onLoginClick}) => {
           <p className="text-black px-3 py-3 ">
             글로벌1조
           </p> 
+          <p className="text-black px-3 py-3 ">
+            테스트 글자입니다!!!!
+          </p> 
 
           <div 
           className="relative inline-block bg-white rounded-md shadow px-3 py-3  float-right col-start-12">
